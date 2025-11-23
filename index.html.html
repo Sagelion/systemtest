@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智慧護理系統 (臨床專業增強版)</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --success: #27ae60;
+            --danger: #e74c3c;
+            --warning: #f39c12;
+            --bg: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #333;
+        }
+        body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; margin: 0; display: flex; height: 100vh; background: var(--bg); color: var(--text-main); overflow: hidden; }
+
+        /* --- 側邊欄 --- */
+        .sidebar { width: 260px; background: var(--primary); color: white; display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .patient-info { padding: 25px 20px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .patient-name { font-size: 1.4rem; font-weight: bold; margin-bottom: 5px; }
+        .patient-detail { font-size: 0.9rem; opacity: 0.8; line-height: 1.5; }
+        
+        .menu { flex: 1; padding: 20px 10px; overflow-y: auto; }
+        .nav-item { padding: 12px 15px; margin-bottom: 8px; border-radius: 8px; cursor: pointer; color: #bdc3c7; transition: all 0.2s; display: flex; align-items: center; gap: 12px; font-weight: 500; }
+        .nav-item:hover { background: rgba(255,255,255,0.1); color: white; transform: translateX(5px); }
+        .nav-item.active { background: var(--accent); color: white; box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3); }
+
+        /* --- 主內容區 --- */
+        .main { flex: 1; padding: 25px; overflow-y: auto; position: relative; }
+        .page { display: none; animation: fadeIn 0.4s ease-out; } 
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- 卡片與元件 --- */
+        .card { background: var(--card-bg); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #e1e4e8; }
+        .card-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0; }
+        h2 { margin: 0; font-size: 1.2rem; color: var(--primary); font-weight: 700; }
+
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; color: white; font-weight: bold; font-size: 0.9rem; transition: 0.2s; display: inline-flex; align-items: center; justify-content: center; }
+        .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-blue { background: var(--accent); } .btn-green { background: var(--success); } .btn-red { background: var(--danger); } 
+        .btn-outline { background: transparent; border: 1px solid #ccc; color: #666; } .btn-outline:hover { background: #f9f9f9; }
+
+        input, select, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 6px; width: 100%; box-sizing: border-box; margin-bottom: 8px; font-family: inherit; }
+        input:focus { border-color: var(--accent); outline: none; }
+
+        /* --- 儀表板 Grid --- */
+        .dash-header { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .stat-card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); border-left: 5px solid #ccc; position: relative; }
+        .stat-label { font-size: 0.85rem; color: #888; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; }
+        .stat-val { font-size: 1.6rem; font-weight: 800; color: var(--primary); }
+        .stat-sub { font-size: 0.9rem; margin-top: 5px; }
+        .stat-time { position: absolute; top: 10px; right: 10px; font-size: 0.7rem; color: #ccc; background: #f9f9f9; padding: 2px 5px; border-radius: 4px; }
+
+        .dash-grid { display: grid; grid-template-columns: 2fr 1.2fr; gap: 20px; }
+        
+        /* --- 人形圖精細版 --- */
+        .body-layout { display: flex; height: 600px; border: 1px solid #eee; border-radius: 10px; overflow: hidden; background: #fff; }
+        .body-map-area { flex: 2; position: relative; background: #fff; cursor: crosshair; display: flex; justify-content: center; align-items: center; border-right: 1px solid #f0f0f0; }
+        
+        .body-svg { height: 98%; width: auto; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.05)); }
+        .body-path { fill: #f0f4f8; stroke: #bdc3c7; stroke-width: 1.2; transition: 0.2s; }
+        .body-path:hover { fill: #e3e8ec; stroke: var(--accent); stroke-width: 2; }
+        
+        .mark-point { fill: rgba(231, 76, 60, 0.9); stroke: white; stroke-width: 2px; cursor: pointer; animation: pulse 2s infinite; }
+        .mark-line { stroke: var(--danger); stroke-width: 1.5px; fill: none; pointer-events: none; stroke-dasharray: 4; }
+        .mark-text { font-size: 12px; fill: #333; font-weight: bold; pointer-events: none; dominant-baseline: middle; text-shadow: 0 0 3px white; }
+        @keyframes pulse { 0% { r: 4; opacity: 1; } 50% { r: 6; opacity: 0.6; } 100% { r: 4; opacity: 1; } }
+
+        .tube-display-area { flex: 1; background: #fafbfc; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; }
+        .tube-item { background: white; border: 1px solid #eee; border-left: 4px solid var(--accent); padding: 10px; margin-bottom: 8px; border-radius: 4px; }
+        .tube-item.expired { border-left-color: var(--danger); background: #fff5f5; }
+
+        /* --- 給藥時間軸 --- */
+        .timeline-container { position: relative; padding: 40px 10px 20px 10px; border-bottom: 1px solid #eee; background: #fff; border-radius: 8px; margin-bottom: 20px; overflow-x: auto; }
+        .timeline-line { height: 4px; background: #eee; border-radius: 2px; position: relative; top: 10px; width: 100%; min-width: 600px; }
+        .tl-mark { position: absolute; top: -6px; width: 16px; height: 16px; background: var(--success); border: 3px solid white; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.2); cursor: pointer; transition: 0.2s; z-index: 2; }
+        .tl-mark:hover { transform: scale(1.3); z-index: 10; }
+        .tl-label { position: absolute; top: 20px; transform: translateX(-50%); font-size: 0.75rem; color: #555; white-space: nowrap; background: rgba(255,255,255,0.9); padding: 2px 4px; border-radius: 4px; border: 1px solid #eee; text-align: center; }
+        .tl-time-axis { display: flex; justify-content: space-between; font-size: 0.7rem; color: #999; margin-top: 25px; min-width: 600px; }
+
+        /* --- 圖表 --- */
+        .chart-wrapper { margin-bottom: 20px; border: 1px solid #eee; padding: 15px; border-radius: 8px; background: white; }
+        .chart-title { font-weight: bold; color: var(--primary); margin-bottom: 10px; display: flex; justify-content: space-between; }
+
+        /* --- 待辦 --- */
+        .todo-item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid #f0f0f0; }
+        .todo-item button { margin-left: auto; background: #ffebee; color: var(--danger); border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .todo-item button:hover { background: var(--danger); color: white; }
+
+        .modal { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content:center; align-items:center; }
+        .modal-content { background: white; padding: 30px; width: 90%; max-width: 450px; border-radius: 12px; }
+
+        @media (max-width: 900px) { .dash-grid, .body-layout { grid-template-columns: 1fr; flex-direction: column; } .body-map-area { height: 400px; } .sidebar { width: 60px; } .sidebar .patient-info, .sidebar .nav-item span { display: none; } .sidebar .nav-item { justify-content: center; } }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="patient-info">
+        <div class="patient-name" id="pName">王大明</div>
+        <div class="patient-detail" id="pDetail">A123456789<br>85歲 / 男性</div>
+        <div style="margin-top:10px; font-size:0.8rem; text-decoration:underline; cursor:pointer;" onclick="openPModal()">編輯個案</div>
+    </div>
+    <div class="menu">
+        <div class="nav-item active" onclick="go('dash')">📊 總覽與儀表板</div>
+        <div class="nav-item" onclick="go('vitals')">📈 生命徵象監測</div>
+        <div class="nav-item" onclick="go('meds')">💊 給藥紀錄 (eMAR)</div>
+        <div class="nav-item" onclick="go('io')">💧 I/O 平衡紀錄</div>
+        <div class="nav-item" onclick="go('tubes')">🩸 管路管理</div>
+        <div class="nav-item" onclick="go('labs')">🧪 檢驗報告</div>
+    </div>
+    <div style="padding:20px; margin-top:auto;">
+        <button class="btn btn-outline" style="width:100%; font-size:0.8rem;" onclick="exportData()">備份 / 還原</button>
+        <input type="file" id="impFile" hidden onchange="importData(this)">
+    </div>
+</div>
+
+<div class="main">
+
+    <!-- 1. 儀表板 Dashboard -->
+    <div id="page-dash" class="page active">
+        <!-- 頂部數據卡片 -->
+        <div class="dash-header">
+            <!-- 綜合 Vitals -->
+            <div class="stat-card" style="border-left-color: #e74c3c;">
+                <div class="stat-label">血壓 BP</div>
+                <div class="stat-val" id="dashBP">--/--</div>
+                <div class="stat-sub">mmHg</div>
+                <div class="stat-time" id="dashT1">--</div>
+            </div>
+            <div class="stat-card" style="border-left-color: #27ae60;">
+                <div class="stat-label">脈搏 Pulse</div>
+                <div class="stat-val" id="dashHR">--</div>
+                <div class="stat-sub">bpm</div>
+                <div class="stat-time" id="dashT2">--</div>
+            </div>
+            <!-- 獨立體溫 -->
+            <div class="stat-card" style="border-left-color: #f39c12;">
+                <div class="stat-label">體溫 Temp</div>
+                <div class="stat-val" id="dashTemp">--</div>
+                <div class="stat-sub">°C</div>
+                <div class="stat-time" id="dashT3">--</div>
+            </div>
+            <!-- I/O 淨平衡 -->
+            <div class="stat-card" style="border-left-color: #3498db;">
+                <div class="stat-label">今日 I/O 平衡</div>
+                <div class="stat-val" id="dashBal">0</div>
+                <div class="stat-sub" style="font-size:0.85rem;">
+                    In: <span style="color:#3498db" id="dashIn">0</span> / Out: <span style="color:#27ae60" id="dashOut">0</span>
+                </div>
+                <div class="stat-time">Today</div>
+            </div>
+        </div>
+
+        <div class="dash-grid">
+            <!-- 左側：精細人形圖 + 管路 -->
+            <div class="card" style="margin:0; padding:0; border:none; box-shadow:none;">
+                <div class="card-h" style="background:white; padding:15px; border-radius:12px 12px 0 0; margin:0; border-bottom:1px solid #eee;">
+                    <h2>👤 傷口與管路整合圖</h2>
+                    <button class="btn btn-outline" style="font-size:0.8rem; padding:2px 8px;" onclick="clearAllMarks()">清除標記</button>
+                </div>
+                <div class="body-layout">
+                    <div class="body-map-area" id="bodyMapWrapper" onclick="onBodyClick(event)">
+                        <!-- 高精度 SVG 人體圖 -->
+                        <svg id="bodySvg" class="body-svg" viewBox="0 0 300 700" preserveAspectRatio="xMidYMid meet">
+                            <!-- 頭部 -->
+                            <path class="body-path" d="M150 20 C130 20, 110 35, 110 65 C110 90, 130 110, 150 110 C170 110, 190 90, 190 65 C190 35, 170 20, 150 20 Z" />
+                            <!-- 頸部 -->
+                            <path class="body-path" d="M135 105 L135 130 L165 130 L165 105 Z" />
+                            <!-- 軀幹 (胸+腹) -->
+                            <path class="body-path" d="M120 130 L180 130 C200 130, 215 145, 210 200 L205 290 L95 290 L90 200 C85 145, 100 130, 120 130 Z" />
+                            <!-- 骨盆區域 -->
+                            <path class="body-path" d="M95 290 L205 290 L200 350 L100 350 Z" />
+                            <!-- 左臂 (含手掌) -->
+                            <path class="body-path" d="M90 140 L65 135 C45 135, 35 150, 40 180 L50 260 L70 260 L65 180 L85 145 Z" />
+                            <circle class="body-path" cx="60" cy="275" r="15" /> <!-- 手掌示意 -->
+                            <!-- 右臂 (含手掌) -->
+                            <path class="body-path" d="M210 140 L235 135 C255 135, 265 150, 260 180 L250 260 L230 260 L235 180 L215 145 Z" />
+                            <circle class="body-path" cx="240" cy="275" r="15" /> <!-- 手掌示意 -->
+                            <!-- 左腿 (大腿+小腿) -->
+                            <path class="body-path" d="M100 350 L145 350 L140 500 L135 650 L105 650 L100 500 Z" />
+                            <!-- 右腿 (大腿+小腿) -->
+                            <path class="body-path" d="M155 350 L200 350 L200 500 L195 650 L165 650 L160 500 Z" />
+                            
+                            <g id="markLayer"></g>
+                        </svg>
+                        <div style="position:absolute; bottom:10px; left:10px; font-size:0.75rem; color:#999;">* 點擊部位新增標記</div>
+                    </div>
+                    <!-- 管路整合框 -->
+                    <div class="tube-display-area">
+                        <div style="font-weight:bold; color:var(--primary); margin-bottom:10px; border-bottom:2px solid #eee; padding-bottom:5px;">🩸 管路監控 (自動同步)</div>
+                        <div id="dashTubeList"></div>
+                        <button class="btn btn-outline" style="margin-top:auto;" onclick="go('tubes')">管理管路 ></button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：待辦與護理紀錄 -->
+            <div style="display:flex; flex-direction:column; gap:20px;">
+                <!-- 待辦 (含刪除鈕) -->
+                <div class="card" style="margin:0; flex:1;">
+                    <div class="card-h">
+                        <h2 style="color:var(--danger)">🔔 待辦事項</h2>
+                    </div>
+                    <div style="display:flex; gap:5px; margin-bottom:10px;">
+                        <input id="todoTxt" placeholder="事項..." style="margin:0;">
+                        <input type="date" id="todoDate" style="width:120px; margin:0;">
+                        <button class="btn btn-red" style="font-size:1.2rem; padding:0 12px;" onclick="addTodo()">+</button>
+                    </div>
+                    <div id="todoList" style="max-height:250px; overflow-y:auto;"></div>
+                </div>
+
+                <!-- 護理紀錄 -->
+                <div class="card" style="margin:0; flex:1; display:flex; flex-direction:column;">
+                    <div class="card-h">
+                        <h2>✍️ 護理紀錄</h2>
+                        <input type="date" id="noteFilterDate" onchange="renderNotes()" style="width:130px; margin:0;">
+                    </div>
+                    <div style="background:#f8f9fa; padding:10px; border-radius:8px; margin-bottom:10px; border:1px solid #eee;">
+                        <div style="display:flex; gap:5px;">
+                            <select id="noteShift" style="width:80px;"><option value="day">☀️ 白</option><option value="night">🌙 夜</option></select>
+                            <input type="time" id="noteTime">
+                            <button class="btn btn-blue" onclick="addNote()">提交</button>
+                        </div>
+                        <textarea id="noteTxt" rows="1" placeholder="輸入紀錄 (SOAPE)..." style="margin:0; resize:none;"></textarea>
+                    </div>
+                    <div id="noteList" style="flex:1; overflow-y:auto; min-height:150px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 生命徵象監測 (含獨立圖表) -->
+    <div id="page-vitals" class="page">
+        <div class="card">
+            <div class="card-h"><h2>📈 生命徵象輸入</h2><button class="btn btn-outline" onclick="openVitalModal()">⚙️ 欄位設定 (含獨立圖表)</button></div>
+            <div id="vitalInputs" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:15px; margin-bottom:15px;"></div>
+            <div style="text-align:right;"><button class="btn btn-blue" onclick="saveVitals()">儲存數值</button></div>
+        </div>
+        
+        <!-- 自動生成圖表區 -->
+        <div id="chartsArea"></div>
+    </div>
+
+    <!-- 3. 給藥紀錄 (時間軸 + 統計) -->
+    <div id="page-meds" class="page">
+        <div class="card">
+            <div class="card-h">
+                <h2>🕒 今日給藥時間軸</h2>
+                <button class="btn btn-outline" onclick="renderMedTimeline()">🔄 刷新</button>
+            </div>
+            <div class="timeline-container">
+                <div style="position:relative; min-width:600px;">
+                    <!-- 時間刻度 0-24 -->
+                    <div class="timeline-line"></div>
+                    <div id="tlMarkers"></div>
+                    <div class="tl-time-axis">
+                        <span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 2fr 1fr; gap:20px;">
+            <div class="card">
+                <div class="card-h"><h2>💊 藥物清單 (點擊給藥)</h2><button class="btn btn-green" onclick="openMedModal()">➕ 新增藥囑</button></div>
+                <div id="medGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(180px,1fr)); gap:10px;"></div>
+            </div>
+            <div class="card">
+                <div class="card-h"><h2>📋 統計清單</h2></div>
+                <div id="medLogList" style="max-height:400px; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. I/O, Tubes, Labs -->
+    <div id="page-io" class="page">
+        <div class="card">
+            <div class="card-h"><h2>💧 I/O 紀錄</h2><button class="btn btn-outline" onclick="openIOModal()">設定</button></div>
+            <div style="background:#eef6fb; padding:15px; border-radius:8px; margin-bottom:15px; display:flex; gap:10px;">
+                <select id="ioSelect" style="flex:1; margin:0;"></select>
+                <input type="number" id="ioAmt" placeholder="ml" style="width:100px; margin:0;">
+                <button class="btn btn-blue" onclick="addIO()">新增</button>
+            </div>
+            <table style="width:100%; border-collapse:collapse; font-size:0.9rem;">
+                <thead style="background:#eee;"><tr><th style="padding:10px;">時間</th><th>項目</th><th>數值</th><th></th></tr></thead>
+                <tbody id="ioLogBody"></tbody>
+            </table>
+        </div>
+        <div class="card"><div class="card-h"><h2>📊 平衡趨勢</h2></div><div id="ioChart" style="height:250px;"></div></div>
+    </div>
+
+    <div id="page-tubes" class="page">
+        <div class="card">
+            <div class="card-h"><h2>🩸 管路管理</h2><button class="btn btn-blue" onclick="openTubeModal()">➕ 新增</button></div>
+            <div style="margin-bottom:10px; color:#666;">* 此處資料會同步至儀表板人形圖旁</div>
+            <div id="tubeList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:15px;"></div>
+        </div>
+    </div>
+
+    <div id="page-labs" class="page">
+        <div class="card">
+            <div class="card-h"><h2>🧪 檢驗報告</h2><button class="btn btn-blue" onclick="openLabModal()">➕ 新增</button></div>
+            <div id="labList" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:15px;"></div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modals -->
+<div id="pModal" class="modal"><div class="modal-content"><h3>編輯個案資料</h3><label>姓名</label><input id="editPName"><label>細節</label><textarea id="editPDetail" rows="3"></textarea><button class="btn btn-blue" style="width:100%; margin-top:10px;" onclick="savePInfo()">儲存</button><button class="btn btn-outline" style="width:100%; margin-top:5px;" onclick="closeModal('pModal')">取消</button></div></div>
+<div id="bodyMarkModal" class="modal"><div class="modal-content"><h3>📍 新增傷口標記</h3><input id="markNote" placeholder="說明 (如: 壓瘡 3x3cm)"><input type="hidden" id="markX"><input type="hidden" id="markY"><button class="btn btn-blue" style="width:100%; margin-top:10px;" onclick="saveBodyMark()">確定</button><button class="btn btn-outline" style="width:100%; margin-top:5px;" onclick="closeModal('bodyMarkModal')">取消</button></div></div>
+<div id="vitalModal" class="modal"><div class="modal-content"><h3>⚙️ 監測欄位設定</h3><div id="vSetList" style="max-height:200px; overflow-y:auto; margin-bottom:10px;"></div><div style="border-top:1px solid #eee; padding-top:10px;"><input id="nvl" placeholder="名稱 (如: 體重)"><input type="color" id="nvc" value="#8e44ad" style="width:50px;"><br><label><input type="checkbox" id="nvs"> 設為獨立圖表 (不與生命徵象混合)</label><button class="btn btn-blue" style="width:100%; margin-top:5px;" onclick="addVField()">新增欄位</button></div><button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="closeModal('vitalModal')">關閉</button></div></div>
+<div id="medModal" class="modal"><div class="modal-content"><h3>新增藥物</h3><input id="nmn" placeholder="藥名"><input id="nmd" placeholder="劑量/頻率"><button class="btn btn-green" style="width:100%; margin-top:10px;" onclick="addMed()">新增</button><button class="btn btn-outline" style="width:100%; margin-top:5px;" onclick="closeModal('medModal')">取消</button></div></div>
+<div id="ioModal" class="modal"><div class="modal-content"><h3>I/O 項目</h3><div id="ioSetList"></div><div style="margin-top:10px;"><input id="niol" placeholder="名稱"><select id="niot"><option value="in">Input</option><option value="out">Output</option></select><button class="btn btn-blue" style="width:100%;" onclick="addIOType()">新增</button></div><button class="btn btn-outline" style="width:100%; margin-top:10px;" onclick="closeModal('ioModal')">關閉</button></div></div>
+<div id="labModal" class="modal"><div class="modal-content"><h3>新增檢驗</h3><input type="date" id="labDate"><div id="labInputs"></div><button class="btn btn-outline" onclick="addLabRow()">+ 欄位</button><button class="btn btn-blue" style="width:100%; margin-top:10px;" onclick="saveLab()">儲存</button><button class="btn btn-outline" style="width:100%; margin-top:5px;" onclick="closeModal('labModal')">取消</button></div></div>
+<div id="tubeModal" class="modal"><div class="modal-content"><h3>新增管路</h3><input id="tName" placeholder="名稱"><input id="tLoc" placeholder="規格/位置"><label>置放日</label><input type="date" id="tDate"><label>到期日</label><input type="date" id="tDue"><button class="btn btn-blue" style="width:100%; margin-top:10px;" onclick="saveTube()">儲存</button><button class="btn btn-outline" style="width:100%; margin-top:5px;" onclick="closeModal('tubeModal')">取消</button></div></div>
+
+<script>
+    const KEY = 'nursing_pro_v7_db';
+    let db = {
+        pInfo: {name:'王大明', detail:'A123456789\n85歲 / 男性'},
+        todos: [], notes: [], meds: [], medLogs: [], ioLogs: [], vitals: [], labs: [], tubes: [], bodyMarks: [],
+        ioTypes: [{id:'oral',label:'口服',type:'in'},{id:'iv',label:'點滴',type:'in'},{id:'urine',label:'尿液',type:'out'}],
+        vFields: [
+            {id:'sbp',label:'收縮壓',color:'#e74c3c', sep:false},
+            {id:'dbp',label:'舒張壓',color:'#c0392b', sep:false},
+            {id:'hr',label:'脈搏',color:'#27ae60', sep:false},
+            {id:'temp',label:'體溫',color:'#f39c12', sep:false}
+        ]
+    };
+
+    init();
+
+    function init() {
+        const s = localStorage.getItem(KEY);
+        if(s) {
+            let loaded = JSON.parse(s);
+            if(Array.isArray(loaded.pInfo)) loaded.pInfo = {name:'王大明', detail:'A123456789'};
+            db = { ...db, ...loaded };
+            // 確保舊資料有 sep 屬性
+            db.vFields.forEach(f => { if(f.sep===undefined) f.sep=false; });
+        }
+        
+        const now = new Date();
+        document.getElementById('todoDate').valueAsDate = now;
+        document.getElementById('noteFilterDate').valueAsDate = now;
+        document.getElementById('noteTime').value = now.toTimeString().slice(0,5);
+        
+        renderAll();
+    }
+
+    function save() { localStorage.setItem(KEY, JSON.stringify(db)); }
+    function renderAll() {
+        renderPInfo(); renderDash(); renderTodos(); renderNotes(); 
+        renderMeds(); renderMedTimeline(); renderLabs(); renderTubes(); renderVitals(); renderIO();
+    }
+    function closeModal(id) { document.getElementById(id).style.display='none'; }
+    function go(pid) {
+        document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+        document.getElementById('page-'+pid).classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+        const m={'dash':0,'vitals':1,'meds':2,'io':3,'tubes':4,'labs':5};
+        if(m[pid]!==undefined) document.querySelectorAll('.nav-item')[m[pid]].classList.add('active');
+        if(pid==='dash') renderDash(); 
+        if(pid==='vitals') { renderVitals(); setTimeout(drawAllCharts,100); }
+        if(pid==='io') setTimeout(drawAllCharts,100);
+        if(pid==='meds') renderMedTimeline();
+    }
+
+    // --- Dashboard ---
+    function renderDash() {
+        // Vitals
+        const lastV = db.vitals.length > 0 ? db.vitals[db.vitals.length-1] : null;
+        const tStr = lastV ? new Date(lastV.ts).toLocaleString('zh-TW', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'}) : '--';
+        if(lastV) {
+            document.getElementById('dashBP').innerText = `${lastV.vals['sbp']||'-'}/${lastV.vals['dbp']||'-'}`;
+            document.getElementById('dashHR').innerText = lastV.vals['hr'] || '--';
+            document.getElementById('dashTemp').innerText = lastV.vals['temp'] || '--';
+            ['1','2','3'].forEach(i => document.getElementById('dashT'+i).innerText = tStr);
+        }
+
+        // I/O & Balance
+        const todayStart = new Date().setHours(0,0,0,0);
+        let tIn=0, tOut=0;
+        db.ioLogs.forEach(l => {
+            if(l.ts >= todayStart) {
+                const type = db.ioTypes.find(t=>t.id===l.tid)?.type || 'in';
+                type==='in' ? tIn+=l.v : tOut+=l.v;
+            }
+        });
+        const bal = tIn - tOut;
+        document.getElementById('dashIn').innerText = tIn; 
+        document.getElementById('dashOut').innerText = tOut;
+        const balEl = document.getElementById('dashBal');
+        balEl.innerText = (bal>0 ? '+':'') + bal;
+        balEl.style.color = bal > 0 ? '#3498db' : (bal < 0 ? '#e74c3c' : '#7f8c8d');
+
+        renderBodyMap();
+        renderDashTubes();
+    }
+    
+    function renderDashTubes() {
+        const list = document.getElementById('dashTubeList');
+        const today = new Date().toISOString().split('T')[0];
+        if(db.tubes.length===0) { list.innerHTML='<div style="color:#999;text-align:center;">無管路</div>'; return; }
+        list.innerHTML = db.tubes.map(t => {
+            const isExp = t.due && t.due <= today;
+            return `<div class="tube-item ${isExp?'expired':''}">
+                <div style="font-weight:bold; display:flex; justify-content:space-between;">
+                    ${t.n} <span style="font-size:0.8rem; color:${isExp?'red':'green'}">${isExp?'到期':'使用中'}</span>
+                </div>
+                <div style="font-size:0.8rem; color:#666;">${t.l} | 到期: ${t.due||'--'}</div>
+            </div>`;
+        }).join('');
+    }
+
+    // --- Body Map ---
+    function onBodyClick(e) {
+        const svg = document.getElementById('bodySvg');
+        const rect = svg.getBoundingClientRect();
+        const scaleX = 300 / rect.width;
+        const scaleY = 700 / rect.height;
+        document.getElementById('markX').value = (e.clientX - rect.left) * scaleX;
+        document.getElementById('markY').value = (e.clientY - rect.top) * scaleY;
+        document.getElementById('markNote').value = '';
+        document.getElementById('bodyMarkModal').style.display = 'flex';
+        document.getElementById('markNote').focus();
+    }
+    function saveBodyMark() {
+        const note=document.getElementById('markNote').value, x=document.getElementById('markX').value, y=document.getElementById('markY').value;
+        if(note) { db.bodyMarks.push({id:Date.now(), x, y, note}); save(); renderBodyMap(); closeModal('bodyMarkModal'); }
+    }
+    function renderBodyMap() {
+        const layer = document.getElementById('markLayer'); layer.innerHTML = '';
+        db.bodyMarks.forEach(m => {
+            const isLeft = m.x < 150;
+            const labelX = isLeft ? 10 : 290;
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+            g.innerHTML = `<line x1="${m.x}" y1="${m.y}" x2="${labelX}" y2="${m.y}" class="mark-line"/>
+                           <text x="${labelX}" y="${m.y}" text-anchor="${isLeft?'start':'end'}" class="mark-text">${m.note}</text>
+                           <circle cx="${m.x}" cy="${m.y}" r="5" class="mark-point" onclick="if(confirm('刪除?')){db.bodyMarks=db.bodyMarks.filter(x=>x.id!=${m.id});save();renderBodyMap();}"/>`;
+            layer.appendChild(g);
+        });
+    }
+
+    // --- Vitals & Charts (Independent) ---
+    function openVitalModal(){
+        document.getElementById('vSetList').innerHTML = db.vFields.map((f,i)=>
+            `<div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #eee;">
+                <span><span style="color:${f.color}">●</span> ${f.label} ${f.sep?'(獨立)':''}</span>
+                <span style="color:red; cursor:pointer;" onclick="db.vFields.splice(${i},1);save();openVitalModal();renderVitals();">x</span>
+            </div>`).join('');
+        document.getElementById('vitalModal').style.display='flex';
+    }
+    function addVField(){
+        const l=document.getElementById('nvl').value, c=document.getElementById('nvc').value, s=document.getElementById('nvs').checked;
+        if(l) { db.vFields.push({id:'vf_'+Date.now(), label:l, color:c, sep:s}); save(); openVitalModal(); renderVitals(); }
+    }
+    function renderVitals() {
+        document.getElementById('vitalInputs').innerHTML = db.vFields.map(f => 
+            `<div><label style="color:${f.color}; font-size:0.85rem;">${f.label}</label><input type="number" step="0.1" id="v_${f.id}" style="margin:0;"></div>`
+        ).join('');
+    }
+    function saveVitals() {
+        let vals={}; let has=false;
+        db.vFields.forEach(f => {
+            const v = document.getElementById('v_'+f.id).value;
+            if(v) { vals[f.id] = v; has=true; document.getElementById('v_'+f.id).value=''; }
+        });
+        if(has) { db.vitals.push({ts:Date.now(), vals}); save(); drawAllCharts(); alert('儲存成功'); }
+    }
+
+    function drawAllCharts() {
+        const area = document.getElementById('chartsArea'); area.innerHTML = '';
+        if(db.vitals.length === 0) { area.innerHTML='<div style="text-align:center;color:#999;">無生命徵象資料</div>'; return; }
+        
+        // 1. 綜合圖表 (Standard: BP, HR, Temp or any sep=false)
+        const standardFields = db.vFields.filter(f => !f.sep);
+        if(standardFields.length > 0) {
+            area.innerHTML += createChartHTML(standardFields, "綜合生命徵象趨勢 (BP/Pulse/Temp)");
+        }
+
+        // 2. 獨立圖表 (Custom: Weight, etc.)
+        const separateFields = db.vFields.filter(f => f.sep);
+        separateFields.forEach(f => {
+            area.innerHTML += createChartHTML([f], `${f.label} 獨立趨勢圖`);
+        });
+
+        // I/O Chart update
+        drawIOChart();
+    }
+
+    function createChartHTML(fields, title) {
+        const w=600, h=200, p=30; 
+        // Find min/max for scaling
+        let min=9999, max=-9999;
+        let hasData = false;
+        db.vitals.forEach(r => fields.forEach(f => {
+            if(r.vals[f.id] != null) { min=Math.min(min, r.vals[f.id]); max=Math.max(max, r.vals[f.id]); hasData=true; }
+        }));
+        
+        if(!hasData) return '';
+        min -= 5; max += 5; const range = max - min;
+        
+        // SVG Content
+        let svg = `<svg viewBox="0 0 ${w} ${h}" style="width:100%; height:100%;">`;
+        
+        // Grid lines
+        for(let i=0; i<=4; i++) {
+            const y = h - p - (i/4)*(h-2*p);
+            svg += `<line x1="${p}" y1="${y}" x2="${w-p}" y2="${y}" stroke="#eee"/><text x="${p-5}" y="${y+4}" font-size="10" text-anchor="end" fill="#ccc">${Math.round(min+(i/4)*range)}</text>`;
+        }
+
+        // Lines
+        fields.forEach(f => {
+            const pts = db.vitals.filter(r => r.vals[f.id] != null);
+            if(pts.length > 0) {
+                let d = '';
+                pts.forEach((r, i) => {
+                    const x = p + (i / (pts.length - 1 || 1)) * (w - 2 * p);
+                    const y = h - p - ((r.vals[f.id] - min) / range) * (h - 2 * p);
+                    d += (i===0 ? `M ${x} ${y}` : ` L ${x} ${y}`);
+                    svg += `<circle cx="${x}" cy="${y}" r="3" fill="${f.color}"/><text x="${x}" y="${y-8}" fill="${f.color}" font-size="10" text-anchor="middle">${r.vals[f.id]}</text>`;
+                });
+                svg += `<path d="${d}" fill="none" stroke="${f.color}" stroke-width="2"/>`;
+            }
+        });
+        svg += '</svg>';
+        return `<div class="chart-wrapper"><div class="chart-title">${title}</div><div style="height:200px;">${svg}</div></div>`;
+    }
+
+    // --- Meds & Timeline ---
+    function openMedModal(){document.getElementById('medModal').style.display='flex';}
+    function addMed(){const n=document.getElementById('nmn').value,d=document.getElementById('nmd').value;if(n){db.meds.push({id:Date.now(),n,d});save();renderMeds();closeModal('medModal');}}
+    function renderMeds(){document.getElementById('medGrid').innerHTML=db.meds.map(m=>`<div class="card" style="padding:10px; margin:0; text-align:center;"><b>${m.n}</b><br><small>${m.d}</small><br><button class="btn-green" style="margin-top:5px; width:100%;" onclick="giveMed(${m.id})">給藥</button><button class="btn-outline" style="margin-top:2px; font-size:0.7rem; width:100%; border:none;" onclick="if(confirm('刪除藥囑?')){db.meds=db.meds.filter(x=>x.id!=${m.id});save();renderMeds();}">刪除</button></div>`).join('');}
+    
+    function giveMed(mid){ db.medLogs.unshift({ts:Date.now(),mid}); save(); renderMedTimeline(); renderMedLogs(); }
+    
+    function renderMedTimeline() {
+        const c = document.getElementById('tlMarkers'); c.innerHTML='';
+        const todayStart = new Date().setHours(0,0,0,0);
+        const todayEnd = new Date().setHours(23,59,59,999);
+        
+        const logs = db.medLogs.filter(l => l.ts >= todayStart && l.ts <= todayEnd);
+        if(logs.length === 0) return;
+
+        logs.forEach(l => {
+            const m = db.meds.find(x => x.id === l.mid) || {n:'未知'};
+            const date = new Date(l.ts);
+            // Calculate % position (00:00 to 24:00)
+            const minutes = date.getHours() * 60 + date.getMinutes();
+            const percent = (minutes / 1440) * 100;
+            
+            const div = document.createElement('div');
+            div.className = 'tl-mark';
+            div.style.left = `calc(${percent}% - 8px)`;
+            div.title = `${date.toLocaleTimeString()} - ${m.n}`;
+            div.innerHTML = `<div class="tl-label">${date.getHours()}:${String(date.getMinutes()).padStart(2,'0')}<br>${m.n}</div>`;
+            c.appendChild(div);
+        });
+    }
+
+    function renderMedLogs(){
+        const list = document.getElementById('medLogList');
+        const counts = {};
+        db.medLogs.forEach(l => {
+            const m = db.meds.find(x=>x.id===l.mid)||{n:'未知'};
+            if(!counts[m.n]) counts[m.n] = 0;
+            counts[m.n]++;
+        });
+        
+        let html = '<div style="margin-bottom:10px; padding:10px; background:#f0f8ff; border-radius:5px;"><b>📊 統計:</b> ';
+        for(let k in counts) html += `${k}: ${counts[k]}次 | `;
+        html += '</div>';
+
+        html += db.medLogs.slice(0,40).map(l=>{
+            const m=db.meds.find(x=>x.id===l.mid)||{n:'未知'};
+            return `<div style="padding:8px; border-bottom:1px solid #eee; font-size:0.9rem;">
+                <span style="color:#666;">${new Date(l.ts).toLocaleString()}</span><br>
+                <b>${m.n}</b>
+                <button class="btn-red" style="float:right; padding:2px 6px; font-size:0.7rem;" onclick="if(confirm('刪除紀錄?')){db.medLogs=db.medLogs.filter(x=>x.ts!=${l.ts});save();renderMedTimeline();renderMedLogs();}">x</button>
+            </div>`;
+        }).join('');
+        list.innerHTML = html;
+    }
+
+    // --- I/O, Tubes, Labs, Todos (Standard) ---
+    function openIOModal(){document.getElementById('ioSetList').innerHTML=db.ioTypes.map((t,i)=>`<div>${t.label} (${t.type}) <span onclick="db.ioTypes.splice(${i},1);save();openIOModal();renderIO();" style="color:red;cursor:pointer;">x</span></div>`).join('');document.getElementById('ioModal').style.display='flex';}
+    function addIOType(){const l=document.getElementById('niol').value,t=document.getElementById('niot').value;if(l){db.ioTypes.push({id:'io_'+Date.now(),label:l,type:t});save();openIOModal();renderIO();}}
+    function renderIO(){document.getElementById('ioSelect').innerHTML=db.ioTypes.map(t=>`<option value="${t.id}">${t.label}</option>`).join('');renderIOLogs();}
+    function addIO(){const tid=document.getElementById('ioSelect').value,v=Number(document.getElementById('ioAmt').value);if(tid&&v){db.ioLogs.push({ts:Date.now(),tid,v});save();document.getElementById('ioAmt').value='';renderIOLogs();renderDash();drawAllCharts();}}
+    function renderIOLogs(){
+        const start = new Date().setHours(0,0,0,0);
+        document.getElementById('ioLogBody').innerHTML=db.ioLogs.filter(l=>l.ts>=start).sort((a,b)=>b.ts-a.ts).map(l=>{
+            const t=db.ioTypes.find(x=>x.id===l.tid)||{label:'?',type:'in'};
+            return `<tr><td>${new Date(l.ts).toLocaleTimeString()}</td><td>${t.label}</td><td style="color:${t.type==='in'?'blue':'green'}">${l.v}</td><td><span style="color:red;cursor:pointer;" onclick="db.ioLogs=db.ioLogs.filter(x=>x.ts!=${l.ts});save();renderIOLogs();renderDash();drawAllCharts();">x</span></td></tr>`
+        }).join('');
+    }
+    function drawIOChart(){
+        const c = document.getElementById('ioChart');
+        let d = {};
+        db.ioLogs.forEach(l=>{
+            const k=new Date(l.ts).toLocaleDateString();
+            if(!d[k]) d[k]={i:0,o:0};
+            const t=db.ioTypes.find(x=>x.id===l.tid);
+            if(t && t.type==='in') d[k].i+=l.v; else d[k].o+=l.v;
+        });
+        const keys = Object.keys(d).slice(-7);
+        if(keys.length===0){c.innerHTML='<div style="text-align:center;padding:50px;color:#ccc;">無資料</div>';return;}
+        let max = 1; keys.forEach(k => max=Math.max(max, d[k].i, d[k].o));
+        let s = `<svg viewBox="0 0 600 250" style="width:100%;height:100%;">`;
+        keys.forEach((k,i)=>{
+            const x = (i/keys.length)*560 + 20;
+            const hi = (d[k].i/max)*200; const ho = (d[k].o/max)*200;
+            s += `<rect x="${x}" y="${230-hi}" width="20" height="${hi}" fill="#3498db" opacity="0.8"/>
+                  <rect x="${x+25}" y="${230-ho}" width="20" height="${ho}" fill="#27ae60" opacity="0.8"/>
+                  <text x="${x+22}" y="245" font-size="10" text-anchor="middle">${k.slice(5)}</text>`;
+        });
+        c.innerHTML = s + '</svg>';
+    }
+
+    function addTodo(){const t=document.getElementById('todoTxt').value,d=document.getElementById('todoDate').value;if(t){db.todos.push({t,d});save();renderTodos();document.getElementById('todoTxt').value='';}}
+    function renderTodos(){document.getElementById('todoList').innerHTML=db.todos.map((t,i)=>`<div class="todo-item"><div><b>${t.t}</b><br><small>${t.d}</small></div><button onclick="db.todos.splice(${i},1);save();renderTodos();">🗑️ 刪除</button></div>`).join('');}
+    
+    // Notes, PInfo, Tubes, Labs (Standard)
+    function addNote(){const t=document.getElementById('noteTxt').value,d=document.getElementById('noteFilterDate').value,tm=document.getElementById('noteTime').value;if(t){db.notes.unshift({ts:new Date(`${d}T${tm}`).getTime(),s:document.getElementById('noteShift').value,txt:t});save();renderNotes();document.getElementById('noteTxt').value='';}}
+    function renderNotes(){const fd=document.getElementById('noteFilterDate').value;const l=db.notes.filter(n=>new Date(n.ts).toISOString().startsWith(fd));document.getElementById('noteList').innerHTML=l.map(n=>`<div style="padding:10px;border-bottom:1px solid #eee;"><small>${new Date(n.ts).toLocaleTimeString()} (${n.s==='day'?'白':'夜'})</small><span style="float:right;cursor:pointer;color:red;" onclick="if(confirm('刪除?')){db.notes=db.notes.filter(x=>x.ts!=${n.ts});save();renderNotes();}">x</span><br>${n.txt}</div>`).join('');}
+    function openPModal(){document.getElementById('editPName').value=db.pInfo.name;document.getElementById('editPDetail').value=db.pInfo.detail;document.getElementById('pModal').style.display='flex';}
+    function savePInfo(){db.pInfo={name:document.getElementById('editPName').value,detail:document.getElementById('editPDetail').value};save();renderPInfo();closeModal('pModal');}
+    function renderPInfo(){document.getElementById('pName').innerText=db.pInfo.name;document.getElementById('pDetail').innerText=db.pInfo.detail;}
+    function openTubeModal(){document.getElementById('tDate').valueAsDate=new Date();document.getElementById('tubeModal').style.display='flex';}
+    function saveTube(){const n=document.getElementById('tName').value,l=document.getElementById('tLoc').value,d=document.getElementById('tDate').value,due=document.getElementById('tDue').value;if(n){db.tubes.push({id:Date.now(),n,l,d,due});save();renderTubes();renderDashTubes();closeModal('tubeModal');}}
+    function renderTubes(){document.getElementById('tubeList').innerHTML=db.tubes.map(t=>`<div class="tube-item"><b>${t.n}</b> (${t.l})<br><small>置放:${t.d} / 到期:${t.due||'--'}</small><button class="btn-red" style="float:right;padding:2px;" onclick="db.tubes=db.tubes.filter(x=>x.id!=${t.id});save();renderTubes();renderDashTubes();">刪除</button></div>`).join('');}
+    function openLabModal(){document.getElementById('labDate').valueAsDate=new Date();document.getElementById('labInputs').innerHTML='';addLabRow();addLabRow();document.getElementById('labModal').style.display='flex';}
+    function addLabRow(){document.getElementById('labInputs').insertAdjacentHTML('beforeend',`<div style="display:flex;gap:5px;margin-bottom:5px;"><input placeholder="項目" class="ln"><input placeholder="數值" class="lv"></div>`);}
+    function saveLab(){const i=[];document.querySelectorAll('#labInputs div').forEach(d=>{const n=d.querySelector('.ln').value,v=d.querySelector('.lv').value;if(n)i.push({n,v});});if(i.length){db.labs.unshift({id:Date.now(),date:document.getElementById('labDate').value,items:i});save();renderLabs();closeModal('labModal');}}
+    function renderLabs(){document.getElementById('labList').innerHTML=db.labs.map(l=>`<div class="card" style="margin:0;padding:10px;"><b>${l.date}</b><hr>${l.items.map(i=>`<div>${i.n}: <b>${i.v}</b></div>`).join('')}<button class="btn-red" style="width:100%;margin-top:5px;" onclick="db.labs=db.labs.filter(x=>x.id!=${l.id});save();renderLabs();">刪除</button></div>`).join('');}
+
+    function exportData(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(db)],{type:'application/json'}));a.download='backup.json';a.click();}
+    function importData(el){const r=new FileReader();r.onload=e=>{db=JSON.parse(e.target.result);save();init();alert('還原成功');};r.readAsText(el.files[0]);}
+    window.onclick=e=>{if(e.target.className==='modal')e.target.style.display='none';}
+</script>
+</body>
+</html>
